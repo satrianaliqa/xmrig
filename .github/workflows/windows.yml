@@ -1,4 +1,4 @@
-name: Build XMRig Windows
+name: Build XMRig Windows by Sats
 
 on:
   workflow_dispatch:
@@ -19,11 +19,13 @@ jobs:
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
           choco install ninja git --yes
 
-      - name: Configure and Build
+      - name: Configure and Build (disable HWLOC)
         run: |
           mkdir build
           cd build
-          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+          cmake .. -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DWITH_HWLOC=OFF
           ninja
 
       - name: Package Output
