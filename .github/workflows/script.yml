@@ -1,41 +1,74 @@
-name: Build XMRig
+name: Build XMRig by Sats
 
 on:
-  push:
-    tags:
-      - 'v*'  # Biar cuma build pas lo buat tag rilis, contoh: v1.0.0
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [x64]  # Bisa ditambah arm64 kalau runner support
-
-    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-    - name: Install Dependencies (Linux Only)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt update && sudo apt install -y cmake build-essential libuv1-dev libssl-dev libhwloc-dev
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v1.14
+        with:
+          cmake-version: '3.26.4'
 
-    - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Install Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install -y cmake build-essential libuv1-dev libssl-dev libhwloc-dev
 
-    - name: Build
-      run: cmake --build build --config Release
+      - name: Install Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install cmake openssl hwloc
 
-    - name: Prepare Artifact
-      run: |
-        mkdir release
-        cp build/xmrig* release/ || copy build\Release\xmrig.exe release\
+      - name: Configure Build
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-    - name: Upload Release Assets
-      uses: softprops/action-gh-release@v2
-      with:
-        files: release/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Prepare Release Folder
+        run: |
+          mkdir -p release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp build/Release/xmrig.exe release/xmrig-windows.exe || true
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cp build/xmrig release/xmrig-macos || true
+          else
+            cp build/xmrig release/xmrig-linux || true
+          fi
+        shell: bash
+
+      - name: Compress Artifacts
+        run: |
+          cd release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a ../xmrig-${{ matrix.os }}.zip xmrig-windows.exe
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            zip ../xmrig-${{ matrix.os }}.zip xmrig-macos
+          else
+            zip ../xmrig-${{ matrix.os }}.zip xmrig-linux
+          fi
+        shell: bash
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            xmrig-${{ matrix.os }}.zip
+          tag_name: custom-release
+          replace: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
