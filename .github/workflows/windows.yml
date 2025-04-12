@@ -14,23 +14,33 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Install vcpkg & dependencies
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg install libuv openssl hwloc
+        shell: pwsh
+
+      - name: Install CMake & Ninja
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --yes
-          choco install ninja git --yes
+          choco install ninja --yes
+        shell: pwsh
 
-      - name: Configure and Build (disable HWLOC)
+      - name: Configure & Build with vcpkg toolchain
         run: |
           mkdir build
           cd build
           cmake .. -G "Ninja" `
             -DCMAKE_BUILD_TYPE=Release `
-            -DWITH_HWLOC=OFF
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
           ninja
+        shell: pwsh
 
       - name: Package Output
         run: |
           Compress-Archive -Path build\xmrig.exe -DestinationPath xmrig-windows.zip
+        shell: pwsh
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
