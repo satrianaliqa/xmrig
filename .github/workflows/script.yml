@@ -1,0 +1,41 @@
+name: Build XMRig
+
+on:
+  push:
+    tags:
+      - 'v*'  # Biar cuma build pas lo buat tag rilis, contoh: v1.0.0
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [x64]  # Bisa ditambah arm64 kalau runner support
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies (Linux Only)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt update && sudo apt install -y cmake build-essential libuv1-dev libssl-dev libhwloc-dev
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Prepare Artifact
+      run: |
+        mkdir release
+        cp build/xmrig* release/ || copy build\Release\xmrig.exe release\
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: release/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
